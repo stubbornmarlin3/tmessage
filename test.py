@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from config import HOSTNAME, USER, PASSWORD
+from credentials import HOSTNAME, USER, PASSWORD
 import mysql.connector as mysql
 
 db_connection = mysql.connect(
