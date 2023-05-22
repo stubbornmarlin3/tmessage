@@ -54,23 +54,54 @@
 
 # socketObject.close()
 
-import sys
-from pytermgui import WindowManager, Window
+# import pytermgui as ptg
 
-manager = WindowManager()
-window = (
-    Window(min_width=50)
-    + "[210 bold]My first Window!"
-    + ""
-    + "[157]Try resizing the window by dragging the right border"
-    + "[157]Or drag the top border to move the window"
-    + "[193 bold]Alt-Tab[/bold 157] cycles windows"
-    + "[193 bold]CTRL_C[/bold 157] exits the program"
-    + ""
-    + ["New window", lambda *_: manager.add(window.copy().center())]
-    + ["Close current", lambda _, button: manager.close(button.parent)]
-    + ["Exit program", lambda *_: sys.exit(0)]
-)
+# CONFIG = """
+# config:
+#     InputField:
+#         styles:
+#             prompt: dim italic
+#             cursor: '@72'
+#     Label:
+#         styles:
+#             value: dim bold
 
-manager.add(window)
-manager.run()
+#     Window:
+#         styles:
+#             border: '60'
+#             corner: '60'
+
+#     Container:
+#         styles:
+#             border: '96'
+#             corner: '96'
+# """
+
+# with ptg.YamlLoader() as loader:
+#     loader.load(CONFIG)
+
+# with ptg.WindowManager() as manager:
+#     window = (
+#         ptg.Window(
+#             "",
+#             ptg.InputField("Balazs", prompt="Name: "),
+#             ptg.InputField("Some street", prompt="Address: "),
+#             ptg.InputField("+11 0 123 456", prompt="Phone number: "),
+#             "",
+#             ptg.Container(
+#                 "Additional notes:",
+#                 ptg.InputField(
+#                     "A whole bunch of\nMeaningful notes\nand stuff", multiline=True
+#                 ),
+#                 box="EMPTY_VERTICAL",
+#             ),
+#             "",
+#             ["Submit", lambda *_: manager.__exit__(_, StopIteration, __)],
+#             width=60,
+#             box="DOUBLE",
+#         )
+#         .set_title("[210 bold]New contact")
+#         .center()
+#     )
+
+#     manager.add(window)
