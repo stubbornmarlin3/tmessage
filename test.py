@@ -105,3 +105,32 @@
 #     )
 
 #     manager.add(window)
+
+from passlib.hash import pbkdf2_sha256
+import rsa
+from cryptography.fernet import Fernet
+
+password = b'stryker03'
+
+psh = bytes(pbkdf2_sha256.hash(password).encode())
+
+print(len(psh))
+
+print(pbkdf2_sha256.verify(password, psh))
+
+pub, priv = rsa.newkeys(256)
+
+print(pub, priv)
+
+print(f"{hex(pub.n)}${hex(pub.e)}".encode())
+
+print(f"{hex(priv.d)}${hex(priv.p)}${hex(priv.q)}".encode())
+
+
+pwh = pbkdf2_sha256.hash(password)
+print(pwh)
+
+key = bytes(f'{pwh[-43:]}=',"utf-8")
+print(key, len(key))
+
+f = Fernet(key)
