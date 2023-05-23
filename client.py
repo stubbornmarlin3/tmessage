@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import socket
 from passlib.hash import pbkdf2_sha256
 from cryptography.fernet import Fernet
@@ -28,39 +29,49 @@ class Client:
 
         # Create a socket for the client to use
         self.socketClient = socket.socket()
+        self.socketClient.settimeout(30)
+
 
     def send_command(self, command: str) -> str:
         # Used to send command to the server
 
-        try:
-            # Connect and send command
-            self.socketClient.settimeout(20)
-            self.socketClient.connect((self.server_hostname, self.server_port))
-            self.socketClient.send(command.encode())
+        # Send command
+        self.socketClient.send(command.encode())
 
-            # Get return from server then close connection
-            output = self.socketClient.recv(256).decode()
-
-        except ConnectionRefusedError:
-            return "ConnectionRefusedError"
-        
-        except TimeoutError:
-            return "TimeoutError"
-
-        return output
+        # Get return from server
+        return self.socketClient.recv(2048).decode()
 
     def login(self) -> User:
 
+        # Client gets username and password
         username = input("Username: ")
         password = getpass("Password: ")
 
-        output = self.send_command(f"login {username} {password}")
-        print(output)
+        # Will need to test for formatting of username and password
+        # Will implement later
+ 
+        try:
+            # Start a socket connection to server
+            self.socketClient.connect((self.server_hostname, self.server_port))
 
-        if output:
-            print("Here")
-        else:
-            print("There")
+            # Send the login command w/ parameter "username" to the server
+            # Store return in result - should be old_salt and new_salt
+            result = self.send_command(f"login {username}").split()
+            
+            old_salt = result[0].encode()
+            new_salt = result[1].encode()
+
+            old_hash = pbkdf2_sha256.hash(password, salt=old_salt)
+            new_hash = pbkdf2_sha256.hash(old_hash, salt=new_salt)
+
+            result = self.send_command(new_hash)
+            
+
+        except ConnectionRefusedError: # Usually because not connected to internet (or the server is down)
+            print("ConnectionRefusedError")
+
+        except TimeoutError: # Server took too long to respond
+            print("TimeoutError")
 
 
     def create_account(self) -> None:
@@ -71,4 +82,4 @@ class Client:
 if __name__ == "__main__":
 
     c1 = Client("localhost", 35491)
-    c1.login()
+    u1 = c1.login()
