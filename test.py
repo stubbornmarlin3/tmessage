@@ -109,28 +109,40 @@
 from passlib.hash import pbkdf2_sha256
 import rsa
 from cryptography.fernet import Fernet
+import mysql.connector as mysql
+from credentials import mysql_config
 
 password = b'stryker03'
 
-psh = bytes(pbkdf2_sha256.hash(password).encode())
+psh = pbkdf2_sha256.hash(password).encode()
 
 print(len(psh))
 
 print(pbkdf2_sha256.verify(password, psh))
 
-pub, priv = rsa.newkeys(256)
+pub, priv = rsa.newkeys(2048)
 
 print(pub, priv)
 
-print(f"{hex(pub.n)}${hex(pub.e)}".encode())
+pub = f"{hex(pub.n)}${hex(pub.e)}".encode()
 
-print(f"{hex(priv.d)}${hex(priv.p)}${hex(priv.q)}".encode())
+priv = f"{hex(priv.d)}${hex(priv.p)}${hex(priv.q)}".encode()
 
 
-pwh = pbkdf2_sha256.hash(password)
+pwh = pbkdf2_sha256.hash(password, salt=psh)
 print(pwh)
 
-key = bytes(f'{pwh[-43:]}=',"utf-8")
+key = bytes(f'{pwh[-43:]}='.replace(".","+"),"utf-8")
 print(key, len(key))
 
 f = Fernet(key)
+
+priv = f.encrypt(priv)
+print(len(priv))
+
+db = mysql.connect(**mysql_config)
+print(db.get_server_info())
+dbc = db.cursor()
+dbc.execute(f"INSERT INTO users (username, password_hash, public_key, enc_private_key) VALUES ('arcar', %s, %s, %s)", (psh, pub, priv))
+
+db.commit()
