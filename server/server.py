@@ -5,7 +5,7 @@ import mysql.connector as mysql
 from datetime import datetime
 from passlib.hash import pbkdf2_sha256
 from threading import Thread
-from credentials import mysql_config
+from credentials import mysql_credentials
 from base64 import b64encode
 
 class Server:
@@ -84,14 +84,14 @@ class Server:
         connection.send(data.encode())
 
         # Get return from client
-        return connection.recv(2048).decode()
+        return connection.recv(3000).decode()
 
     def login(self, username: str, connection: socket.socket) -> None:
         print(f"{datetime.now()} {connection.getpeername()} Starting login...")
 
 
         # Create connection to mysql
-        with mysql.connect(**mysql_config) as db:
+        with mysql.connect(**mysql_credentials) as db:
             
             print(f"{datetime.now()} {connection.getpeername()} Connected to MySQL Database!")
             

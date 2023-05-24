@@ -49,13 +49,9 @@ class Client:
         self.socketClient.send(command.encode())
 
         # Get return from server as a list of strings seperated by '||' as defined by server
-        return self.socketClient.recv(2048).decode().split("||")
+        return self.socketClient.recv(3000).decode().split("||")
 
-    def login(self) -> User:
-
-        # Client gets username and password
-        username = input("Username: ")
-        password = getpass("Password: ")
+    def login(self, username: str, password: str) -> User:
 
         # Will need to test for formatting of username and password
         # Will implement later
@@ -78,8 +74,8 @@ class Client:
 
             # Generate the new_hash from the new salt and old hash
 
-            old_hash = pbkdf2_sha256.hash(password, salt=old_salt)
-            test_hash = pbkdf2_sha256.hash(old_hash, salt=session_salt)
+            password_hash = pbkdf2_sha256.hash(password, salt=old_salt)
+            test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
 
             # Send the test_hash to the server
             # Result should be the user data returned: display_name, public_key, enc_private_key respectively
@@ -96,20 +92,17 @@ class Client:
 
             # Unencrypt the private key that was returned from the server
 
-            fernet_key_old = pbkdf2_sha256.hash(password, salt=old_hash.encode())
-            fernet_key_old = bytes(f"{fernet_key_old[-43:]}=".replace(".","+"),"utf-8")
+            fernet_key = pbkdf2_sha256.hash(password, salt=password_hash.encode())
+            fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8")
 
-            f_old = Fernet(fernet_key_old)
+            f = Fernet(fernet_key)
 
-            private_key = f_old.decrypt(enc_private_key).decode()
+            private_key = f.decrypt(enc_private_key).decode()
 
             # Make public_key and private_key into rsa types for the User class
             
-            public_key = public_key.split("$")
-            private_key = private_key.split("$")
-
-            public_key_rsa = rsa.PublicKey(public_key[0], public_key[1])
-            private_key_rsa = rsa.PrivateKey(public_key[0], public_key[1], private_key[0], private_key[1], private_key[2])
+            public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
+            private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
 
             return User(username, display_name, password, public_key_rsa, private_key_rsa)
 
@@ -136,5 +129,5 @@ class Client:
 if __name__ == "__main__":
 
     c1 = Client("localhost", 35491)
-    u1 = c1.login()
+    u1 = c1.login("arcar","stryker03")
     print(u1.private_key)
