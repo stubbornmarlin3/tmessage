@@ -2,32 +2,24 @@
 
 import rsa
 import socket
+from user import User
 from passlib.hash import pbkdf2_sha256
 from cryptography.fernet import Fernet
 from getpass import getpass
 
 class UserDoesNotExist(Exception):
-    "Raised when the user does not exist in Database"
 
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
+    def __init__(self, username: str) -> None:
+        "Raised when the user does not exist in Database"
+
+        super().__init__(f"The user '{username}' does not exist!")
 
 class IncorrectPassword(Exception):
-    "Raised when the password hash does not match one in Database"
 
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
+    def __init__(self, password: str) -> None:
+        "Raised when the password hash does not match one in Database"
 
-class User:
-
-    def __init__(self, username: str, display_name: str, password: str, public_key: rsa.PublicKey, private_key: rsa.PrivateKey) -> None:
-
-        self.username = username
-        self.display_name = display_name
-        self.password = password
-        self.public_key = public_key
-        self.private_key = private_key
-
+        super().__init__(f"The password '{password}' was incorrect!")
 
 class Client:
 
@@ -56,70 +48,54 @@ class Client:
         # Will need to test for formatting of username and password
         # Will implement later
  
-        try:
-            # Start a socket connection to server
-            self.socketClient.connect((self.server_hostname, self.server_port))
+        # Start a socket connection to server
+        self.socketClient.connect((self.server_hostname, self.server_port))
 
-            # Send the login command w/ parameter "username" to the server
-            # Store return in result - should be old_salt and new_salt
-            # If user doesn't exist, will return nothing
+        # Send the login command w/ parameter "username" to the server
+        # Store return in result - should be old_salt and new_salt
+        # If user doesn't exist, will return nothing
 
-            result = self.send_command(f"login {username}")
+        result = self.send_command(f"login {username}")
 
-            if not result[0]:
-                raise UserDoesNotExist
-            
-            old_salt = result[0].encode()
-            session_salt = result[1].encode()
+        if not result[0]:
+            raise UserDoesNotExist(username)
+        
+        old_salt = result[0].encode()
+        session_salt = result[1].encode()
 
-            # Generate the new_hash from the new salt and old hash
+        # Generate the new_hash from the new salt and old hash
 
-            password_hash = pbkdf2_sha256.hash(password, salt=old_salt)
-            test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
+        password_hash = pbkdf2_sha256.hash(password, salt=old_salt)
+        test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
 
-            # Send the test_hash to the server
-            # Result should be the user data returned: display_name, public_key, enc_private_key respectively
-            # If password is wrong, will return nothing
+        # Send the test_hash to the server
+        # Result should be the user data returned: display_name, public_key, enc_private_key respectively
+        # If password is wrong, will return nothing
 
-            result = self.send_command(test_hash)
+        result = self.send_command(test_hash)
 
-            if not result[0]:
-                raise IncorrectPassword
+        if not result[0]:
+            raise IncorrectPassword(password)
 
-            display_name = result[0]
-            public_key = result[1]
-            enc_private_key = result[2]
+        display_name = result[0]
+        public_key = result[1]
+        enc_private_key = result[2]
 
-            # Unencrypt the private key that was returned from the server
+        # Unencrypt the private key that was returned from the server
 
-            fernet_key = pbkdf2_sha256.hash(password, salt=password_hash.encode())
-            fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8")
+        fernet_key = pbkdf2_sha256.hash(password, salt=password_hash.encode())
+        fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8")
 
-            f = Fernet(fernet_key)
+        f = Fernet(fernet_key)
 
-            private_key = f.decrypt(enc_private_key).decode()
+        private_key = f.decrypt(enc_private_key).decode()
 
-            # Make public_key and private_key into rsa types for the User class
-            
-            public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
-            private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
+        # Make public_key and private_key into rsa types for the User class
+        
+        public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
+        private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
 
-            return User(username, display_name, password, public_key_rsa, private_key_rsa)
-
-            
-            
-
-        except ConnectionRefusedError: # Usually because not connected to internet (or the server is down)
-            print("ConnectionRefusedError")
-
-        except TimeoutError: # Server took too long to respond
-            print("TimeoutError")
-
-        except UserDoesNotExist: # User did not exist
-            print("UserDoesNotExist")
-
-        except IncorrectPassword: # Password was incorrect
-            print("IncorrectPassword")
+        return User(username, display_name, password, public_key_rsa, private_key_rsa)
 
     def create_account(self) -> None:
         pass
