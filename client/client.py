@@ -60,13 +60,13 @@ class Client:
         if not result[0]:
             raise UserDoesNotExist(username)
         
-        salt = result[0].encode()
+        stored_salt = result[0].encode()
         # session_salt = result[1].encode()
 
         # Generate the new_hash from the new salt and old hash
 
-        test_hash = pbkdf2_sha256.hash(password, salt=salt)
-        # test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
+        test_hash = pbkdf2_sha256.hash(password, salt=stored_salt)
+        # test_hash = pbkdf2_sha256.hash(password_hash, salt=salt)
 
         # Send the test_hash to the server
         # Result should be the user data returned: display_name, public_key, enc_private_key respectively
