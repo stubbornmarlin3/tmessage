@@ -50,7 +50,7 @@ class Server:
                 self.connections.append(connection)
                 print(f"{datetime.now()} (ConnectionManager) Connection established to {connection.getpeername()}!")
                 Thread(target=self.recv_command, args=[connection]).start()
-                print(f"{datetime.now()} (ConnectionManager) Thread created for {connection}!")
+                print(f"{datetime.now()} (ConnectionManager) Thread created for {connection.getpeername()}!")
 
         except KeyboardInterrupt:
                 print(f"{datetime.now()} KeyboardInterrupt to stop server...")
@@ -80,13 +80,13 @@ class Server:
         print(f"{datetime.now()} (ConnectionManager) Connection closed!")
 
     @contextmanager # Used with "with" statement
-    def mysql_connection(self, connection: socket.socket) -> cursor.MySQLCursor:
+    def mysql_connection(self, connection: socket.socket) -> tuple[cursor.MySQLCursor, mysql.MySQLConnection]:
         try:
             db = mysql.connect(**mysql_credentials)
             print(f"{datetime.now()} {connection.getpeername()} Connected to MySQL Database!")
             dbc = db.cursor()
             print(f"{datetime.now()} {connection.getpeername()} Created a cursor for MySQL Database!")
-            yield dbc
+            yield dbc, db
 
         finally:
             dbc.close()
@@ -98,18 +98,18 @@ class Server:
         connection.send(data.encode())
 
         # Get return from client 
-        return connection.recv(3000).decode()
+        return connection.recv(3072).decode()
 
     def login(self, username: str, connection: socket.socket) -> None:
         print(f"{datetime.now()} {connection.getpeername()} Starting login...")
 
-        with self.mysql_connection(connection) as dbc:
+        with self.mysql_connection(connection) as (dbc, db):
 
             # Get the password_hash and password_salt from the Database to compare to client_hash
             # Also used to confirm the users exists, otherwise stop login
 
             dbc.execute(
-                "SELECT password_hash, password_salt FROM users WHERE username = %s LIMIT 1;",
+                "SELECT password_hash, password_salt, display_name, public_key, enc_private_key FROM users WHERE username = %s LIMIT 1;",
                 (username,)
             )
             result = dbc.fetchall()
@@ -118,10 +118,7 @@ class Server:
                 print(f"{datetime.now()} {connection.getpeername()} Invalid username given: '{username}'!")
                 return
             
-            result = result[0] # Since it is a list of tuples and we only have 1 tuple, drop the list
-            
-            db_hash = result[0] # Get the hash returned from the database
-            db_salt = result[1] # Get the salt returned from the database
+            db_hash, db_salt, display_name, public_key, enc_private_key = result[0] # Get the data returned from the database
             
             # Send back the salt to client. The client will return the hash to check
             client_hash = self.send_data(f"{db_salt}", connection)
@@ -133,29 +130,53 @@ class Server:
             
             print(f"{datetime.now()} {connection.getpeername()} Correct password given!")
 
-            
-            # If the password hashes match, get display name and keys from the Database to give client user data
+            # If the password hashes match, send user data
             # (Although someone could just hack the Database to get this information, 
             # the only thing that is sacred is the private_key, which is encrypted by the password.)
             # This means that the only way to decrypt the key is with the password, which is never stored on the server or database
-
-            dbc.execute(
-                "SELECT display_name, public_key, enc_private_key FROM users WHERE username = %s LIMIT 1;",
-                (username,)
-            )
-            result = dbc.fetchall()[0] # Drop the list, should always return something since user is confirmed to be there
-
-            display_name = result[0]
-            public_key = result[1]
-            enc_private_key = result[2]
 
             print(f"{datetime.now()} {connection.getpeername()} Sending {username}'s account data...")
 
             self.send_data(f"{display_name}||{public_key}||{enc_private_key}", connection)
 
 
-    def create_account(self, username: str) -> None:
-        pass
+    def create_account(self, username: str, connection: socket.socket) -> None:
+        print(f"{datetime.now()} {connection.getpeername()} Starting create_account...")
+
+        with self.mysql_connection(connection) as (dbc, db):
+
+            dbc.execute(
+                "SELECT 1 FROM users WHERE username = %s LIMIT 1;",
+                (username,)
+            )
+            result = dbc.fetchall()
+
+            if result:
+                print(f"{datetime.now()} {connection.getpeername()} User already exists: '{username}'!")
+                return
+            
+            print(f"{datetime.now()} {connection.getpeername()} Creating user '{username}'...")
+            
+            # Send <> to say "ready for the user data"
+            # The result will be the userdata seperated by '||'
+            # Need to encode all the data into bytes for the database
+            password_hash, new_salt, public_key, enc_private_key = list(map(lambda data: data.encode(), self.send_data("<>", connection).split("||")))
+
+            print(f"{datetime.now()} {connection.getpeername()} Received hash, salt, & keys!")
+
+            # Store in database!
+
+            dbc.execute(
+                "INSERT INTO users (username, password_hash, password_salt, public_key, enc_private_key) VALUES (%s, %s, %s, %s, %s)",
+                (username, password_hash, new_salt, public_key, enc_private_key)
+            )
+
+            print(f"{datetime.now()} {connection.getpeername()} Adding to database...")
+
+            db.commit()
+
+            print(f"{datetime.now()} {connection.getpeername()} User {username} successfully created!")
+
 
 
 if __name__ == "__main__":
