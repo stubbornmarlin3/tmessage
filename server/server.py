@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os
+
 import socket
 import mysql.connector as mysql
 from mysql.connector import cursor
@@ -50,7 +50,7 @@ class Server:
                 self.connections.append(connection)
                 print(f"{datetime.now()} (ConnectionManager) Connection established to {connection.getpeername()}!")
                 Thread(target=self.recv_command, args=[connection]).start()
-                print(f"{datetime.now()} (ConnectionManager) Thread created!")
+                print(f"{datetime.now()} (ConnectionManager) Thread created for {connection}!")
 
         except KeyboardInterrupt:
                 print(f"{datetime.now()} KeyboardInterrupt to stop server...")
