@@ -52,7 +52,7 @@ class Client:
         self.socketClient.connect((self.server_hostname, self.server_port))
 
         # Send the login command w/ parameter "username" to the server
-        # Store return in result - should be old_salt and new_salt
+        # Store return in result - should be the salt
         # If user doesn't exist, will return nothing
 
         result = self.send_command(f"login {username}")
@@ -60,13 +60,13 @@ class Client:
         if not result[0]:
             raise UserDoesNotExist(username)
         
-        old_salt = result[0].encode()
-        session_salt = result[1].encode()
+        salt = result[0].encode()
+        # session_salt = result[1].encode()
 
         # Generate the new_hash from the new salt and old hash
 
-        password_hash = pbkdf2_sha256.hash(password, salt=old_salt)
-        test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
+        test_hash = pbkdf2_sha256.hash(password, salt=salt)
+        # test_hash = pbkdf2_sha256.hash(password_hash, salt=session_salt)
 
         # Send the test_hash to the server
         # Result should be the user data returned: display_name, public_key, enc_private_key respectively
@@ -83,14 +83,14 @@ class Client:
 
         # Unencrypt the private key that was returned from the server
 
-        fernet_key = pbkdf2_sha256.hash(password, salt=password_hash.encode())
-        fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8")
+        fernet_key = pbkdf2_sha256.hash(password, salt=test_hash.encode())
+        fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8") # Need to replace '.' with '+' because it is not in the base64 encoding, which is needed for fernet keys
 
         f = Fernet(fernet_key)
 
         private_key = f.decrypt(enc_private_key).decode()
 
-        # Make public_key and private_key into rsa types for the User class
+        # Load in Public and Private keys for the User class
         
         public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
         private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)

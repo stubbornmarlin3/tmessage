@@ -5,10 +5,8 @@ import mysql.connector as mysql
 from mysql.connector import cursor
 from datetime import datetime
 from contextlib import contextmanager
-from passlib.hash import pbkdf2_sha256
 from threading import Thread
 from credentials import mysql_credentials
-from base64 import b64encode
 
 
 class Server:
@@ -122,15 +120,14 @@ class Server:
             
             result = result[0] # Since it is a list of tuples and we only have 1 tuple, drop the list
             
-            old_hash = result[0] # Get the hash returned from the database
-            old_salt = result[1] # Get the salt returned from the database
-            session_salt = b64encode(os.urandom(64)) # Generate a new salt
+            db_hash = result[0] # Get the hash returned from the database
+            db_salt = result[1] # Get the salt returned from the database
             
-            # Send back the old and new salt to client. The client will return the hash to check
-            client_hash = self.send_data(f"{old_salt}||{session_salt.decode()}", connection)
+            # Send back the salt to client. The client will return the hash to check
+            client_hash = self.send_data(f"{db_salt}", connection)
             print(f"{datetime.now()} {connection.getpeername()} Username: {username}")
 
-            if pbkdf2_sha256.hash(old_hash, salt=session_salt) != client_hash: # Compare hashes
+            if db_hash != client_hash: # Compare hashes
                 print(f"{datetime.now()} {connection.getpeername()} Incorrect password given for username '{username}'!")
                 return
             
