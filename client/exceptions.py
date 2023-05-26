@@ -18,3 +18,10 @@ class UserAlreadyExists(Exception):
         "Raised when the username already exists in the Database"
 
         super().__init__(f"The username '{username}' is already taken!")
+
+class ServerError(Exception):
+
+    def __init__(self, *args: object) -> None:
+        "Raised when something goes wrong server side"
+
+        super().__init__(f"Something went wrong on the server!", *args)

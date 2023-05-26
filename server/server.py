@@ -70,6 +70,8 @@ class Server:
                 self.login(command[1], connection)
             case "create":
                 self.create_account(command[1], connection)
+            case "delete":
+                self.delete_account(command[1], connection)
             case other:
                 print(f"{datetime.now()} {connection.getpeername()} Unknown command '{command}'!")
                 connection.send(f"Unknown command {command}".encode())
@@ -122,7 +124,7 @@ class Server:
             
             # Send back the salt to client. The client will return the hash to check
             client_hash = self.send_data(f"{db_salt}", connection)
-            print(f"{datetime.now()} {connection.getpeername()} Username: {username}")
+            print(f"{datetime.now()} {connection.getpeername()} Login username: {username}")
 
             if db_hash != client_hash: # Compare hashes
                 print(f"{datetime.now()} {connection.getpeername()} Incorrect password given for username '{username}'!")
@@ -177,6 +179,55 @@ class Server:
 
             print(f"{datetime.now()} {connection.getpeername()} User {username} successfully created!")
 
+            self.send_data("<>", connection) # Send this as a way to say everything went good
+
+    def delete_account(self, username: str, connection: socket.socket) -> None:
+        print(f"{datetime.now()} {connection.getpeername()} Starting delete_account...")
+
+        with self.mysql_connection(connection) as (dbc, db):
+
+            # Get the password_hash and password_salt from the Database to compare to client_hash
+            # Also used to confirm the users exists, otherwise stop method
+            
+            dbc.execute(
+                "SELECT password_hash, password_salt FROM users WHERE username = %s LIMIT 1;",
+                (username,)
+            )
+            result = dbc.fetchall()
+
+            if not result:
+                print(f"{datetime.now()} {connection.getpeername()} Invalid username given: '{username}'!")
+                return
+            
+            # Get hash and salt from database
+            db_hash, db_salt = result[0]
+
+            # Send back the salt to client. The client will return the hash to check
+            client_hash = self.send_data(f"{db_salt}", connection)
+            print(f"{datetime.now()} {connection.getpeername()} Delete username: {username}")
+
+            if db_hash != client_hash: # Compare hashes
+                print(f"{datetime.now()} {connection.getpeername()} Incorrect password given for username '{username}'!")
+                return
+            
+            self.send_data("<>", connection) # Send this as a way of saying the password was correct
+            
+            print(f"{datetime.now()} {connection.getpeername()} Correct password given!")
+
+            # Remove user from database
+
+            dbc.execute(
+                "DELETE FROM users WHERE username = %s;",
+                (username,)
+            )
+
+            print(f"{datetime.now()} {connection.getpeername()} Deleting user '{username}'...")
+
+            db.commit()
+
+            print(f"{datetime.now()} {connection.getpeername()} User {username} successfully deleted!")
+
+            self.send_data("<>", connection) # Send this as a way of saying everything went good
 
 
 if __name__ == "__main__":

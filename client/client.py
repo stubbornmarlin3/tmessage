@@ -4,7 +4,7 @@ import os
 import rsa
 import socket
 from user import User
-from exceptions import IncorrectPassword, UserDoesNotExist, UserAlreadyExists
+from exceptions import IncorrectPassword, UserDoesNotExist, UserAlreadyExists, ServerError
 from passlib.hash import pbkdf2_sha256
 from cryptography.fernet import Fernet
 from contextlib import contextmanager
@@ -15,61 +15,59 @@ class Client:
     def __init__(self, server_hostname: str, server_port: int) -> None:
         
         # Set hostname and port for the server from the creation of the client
-        self.server_hostname = server_hostname 
-        self.server_port = server_port
+        self._server_hostname = server_hostname 
+        self._server_port = server_port
 
         # Alloc a list where Users connected to this client are held
-        self.users:list[User] = []
+        self._users:list[User] = []
 
     @contextmanager
-    def socket_connection(self) -> None:
+    def _socket_connection(self) -> None:
         try:
-            self.socketClient = socket.socket()
-            self.socketClient.settimeout(20)
-            self.socketClient.connect((self.server_hostname, self.server_port))
+            self._socketClient = socket.socket()
+            self._socketClient.settimeout(20)
+            self._socketClient.connect((self._server_hostname, self._server_port))
             yield
         finally:
-            self.socketClient.close()
+            self._socketClient.close()
 
-    def send_command(self, command: str) -> str:
+    def _send_command(self, command: str) -> str:
         # Used to send command to the server
 
         # Send command
-        self.socketClient.send(command.encode())
+        self._socketClient.send(command.encode())
 
         # Get return from server 
-        return self.socketClient.recv(3072).decode()
+        return self._socketClient.recv(3072).decode()
 
-    def login(self, username: str, password: str) -> User:
+    def login(self, username: str, password: str) -> None:
 
         # Will need to test for formatting of username and password
         # Will implement later
  
         # Start a socket connection to server
-        with self.socket_connection():
+        with self._socket_connection():
 
             # Send the login command w/ parameter "username" to the server
             # Store return in result - should be the salt
             # If user doesn't exist, will return nothing
 
-            result = self.send_command(f"login {username}")
+            result = self._send_command(f"login {username}")
 
             if not result:
                 raise UserDoesNotExist(username)
             
             stored_salt = result.encode()
-            # session_salt = result[1].encode()
 
             # Generate the new_hash from the new salt and old hash
 
             test_hash = pbkdf2_sha256.hash(password, salt=stored_salt)
-            # test_hash = pbkdf2_sha256.hash(password_hash, salt=salt)
 
             # Send the test_hash to the server
             # Result should be the user data returned: display_name, public_key, enc_private_key respectively
             # If password is wrong, will return nothing
 
-            result = self.send_command(test_hash)
+            result = self._send_command(test_hash)
 
             if not result:
                 raise IncorrectPassword(password)
@@ -91,21 +89,19 @@ class Client:
             public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
             private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
 
-            self.users.append(User(username, None if display_name == "None" else display_name, password, public_key_rsa, private_key_rsa))
+            self._users.append(User(username, None if display_name == "None" else display_name, password, public_key_rsa, private_key_rsa, self))
 
-            return self.users[-1] # Return the last added User
-
-    def create_account(self, username: str, password: str) -> User:
+    def create_account(self, username: str, password: str) -> None:
         
         # Will test for formatting of username and password
         # Will implement later
 
         # Start a socket connection
-        with self.socket_connection():
+        with self._socket_connection():
 
             # Send the create account command to server
 
-            result = self.send_command(f"create {username}")
+            result = self._send_command(f"create {username}")
 
             # If the user already exists the server will return nothing
             if not result:
@@ -135,10 +131,54 @@ class Client:
             enc_private_key = f.encrypt(private_key)
 
             # Send all the hashes and keys to server to store
-            self.send_command(f"{password_hash.decode()}||{new_salt.decode()}||{public_key.decode()}||{enc_private_key.decode()}")
+            result = self._send_command(f"{password_hash.decode()}||{new_salt.decode()}||{public_key.decode()}||{enc_private_key.decode()}")
 
-            self.users.append(User(username, None, password, public_key_rsa, private_key_rsa))
+            if not result:
+                raise ServerError
 
+    def delete_account(self, username:str, password: str) -> None:
+        
+        # Test formatting of username and password
+
+        # Start a socket connection
+        with self._socket_connection():
+
+            # Send the delete account command to server
+
+            result = self._send_command(f"delete {username}")
+
+            if not result:
+                raise UserDoesNotExist(username)
+            
+            stored_salt = result.encode()
+
+            # Generate the new_hash from the new salt and old hash
+
+            test_hash = pbkdf2_sha256.hash(password, salt=stored_salt)
+
+            # Send the test_hash to the server
+            # Result should be the user data returned: display_name, public_key, enc_private_key respectively
+            # If password is wrong, will return nothing
+
+            result = self._send_command(test_hash)
+
+            if not result:
+                raise IncorrectPassword(password)
+            
+            result = self._send_command("<>") # Send this as a way to check for status of 
+            
+            if not result:
+                raise ServerError
+
+
+    def _add_user(self) -> None:
+        pass
+
+    def _remove_user(self) -> None:
+        pass
+
+    def get_users(self) -> list[User]:
+        pass
 
 
 
@@ -146,13 +186,9 @@ if __name__ == "__main__":
 
 
     c1 = Client("localhost", 35491)
-    c2 = Client("localhost", 35491)
-    
-    c1.login("arcar", "stryker03")
+    c1.delete_account("clay","password")
+    c1.delete_account("clay","password")
 
-    c2.create_account("clay","password")
-    c1.login("clay","password")
 
-    
 
     

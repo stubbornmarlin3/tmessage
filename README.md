@@ -33,7 +33,7 @@ Here is a list of methods for the client/server and how they work.
     >  
     > Fetch *`display_name`*, *`public_key`*, & *`encrypted_private_key`* from database. Send to **Client** & close connection.
 
-    > **Client:** Generate *`fernet_key`* using hash from *`password`* & *`client_hash`*. This will only be the correct key if the password is correct. Decrypt *`encrypted_private_key`* & return a *`User`* object with the corresposing attributes.
+    > **Client:** Generate *`fernet_key`* using hash from *`password`* & *`client_hash`*. This will only be the correct key if the password is correct. Decrypt *`encrypted_private_key`* & add *`User`* object.
 
 - ### Create Account
 
