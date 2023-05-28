@@ -169,8 +169,8 @@ class Server:
             # Store in database!
 
             dbc.execute(
-                "INSERT INTO users (username, password_hash, password_salt, public_key, enc_private_key) VALUES (%s, %s, %s, %s, %s)",
-                (username, password_hash, new_salt, public_key, enc_private_key)
+                "INSERT INTO users (username, display_name, password_hash, password_salt, public_key, enc_private_key) VALUES (%s, %s, %s, %s, %s, %s)",
+                (username, username, password_hash, new_salt, public_key, enc_private_key)
             )
 
             print(f"{datetime.now()} {connection.getpeername()} Adding to database...")

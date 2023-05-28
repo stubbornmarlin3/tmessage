@@ -19,7 +19,7 @@ class Client:
         self._server_port = server_port
 
         # Alloc a list where Users connected to this client are held
-        self._users:list[User] = []
+        self.user = {}
 
     @contextmanager
     def _socket_connection(self) -> None:
@@ -89,7 +89,7 @@ class Client:
             public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
             private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
 
-            self._users.append(User(username, None if display_name == "None" else display_name, password, public_key_rsa, private_key_rsa, self))
+            self.user.update({username : User(username, display_name, password, public_key_rsa, private_key_rsa)})
 
     def create_account(self, username: str, password: str) -> None:
         
@@ -140,6 +140,13 @@ class Client:
         
         # Test formatting of username and password
 
+        # Try to remove the user from the dictionary of users
+
+        try:
+            self.user.pop(username)
+        except KeyError:
+            pass
+
         # Start a socket connection
         with self._socket_connection():
 
@@ -171,23 +178,15 @@ class Client:
                 raise ServerError
 
 
-    def _add_user(self) -> None:
-        pass
-
-    def _remove_user(self) -> None:
-        pass
-
-    def get_users(self) -> list[User]:
-        pass
-
-
+    def get_users(self) -> list[str]:
+        return list(self._users.keys())
+    
+    
 
 if __name__ == "__main__":
 
 
     c1 = Client("localhost", 35491)
-    c1.delete_account("clay","password")
-    c1.delete_account("clay","password")
 
 
 
