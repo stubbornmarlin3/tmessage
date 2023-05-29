@@ -72,6 +72,8 @@ class Server:
                 self.create_account(command[1], connection)
             case "delete":
                 self.delete_account(command[1], connection)
+            case "send":
+                self.send_message(command[1], command[2], connection)
             case other:
                 print(f"{datetime.now()} {connection.getpeername()} Unknown command '{command}'!")
                 connection.send(f"Unknown command {command}".encode())
@@ -229,6 +231,11 @@ class Server:
 
             self.send_data("<>", connection) # Send this as a way of saying everything went good
 
+    def send_message(self, to_user: str, from_user: str, connection: socket.socket) -> None:
+        
+        with self.mysql_connection(connection) as (dbc, db):
+            
+            pass
 
 if __name__ == "__main__":
 

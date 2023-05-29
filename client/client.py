@@ -31,11 +31,15 @@ class Client:
         finally:
             self._socketClient.close()
 
-    def _send_command(self, command: str) -> str:
+    def _send_command(self, command: str | bytes) -> str:
         # Used to send command to the server
+        
+        # Convert to bytes if not already
+        if type(command) == str:
+            command = command.encode()
 
         # Send command
-        self._socketClient.send(command.encode())
+        self._socketClient.send(command)
 
         # Get return from server 
         return self._socketClient.recv(3072).decode()
@@ -89,7 +93,7 @@ class Client:
             public_key_rsa = rsa.PublicKey.load_pkcs1(public_key)
             private_key_rsa = rsa.PrivateKey.load_pkcs1(private_key)
 
-            self.user.update({username : User(username, display_name, password, public_key_rsa, private_key_rsa)})
+            self.user.update({username : User(username, display_name, test_hash, public_key_rsa, private_key_rsa, self)})
 
     def create_account(self, username: str, password: str) -> None:
         
@@ -113,7 +117,7 @@ class Client:
             # Generate salt and hash
 
             new_salt = b64encode(os.urandom(64))
-            password_hash = pbkdf2_sha256.hash(password, salt=new_salt).encode()
+            password_hash = pbkdf2_sha256.hash(password, salt=new_salt)
 
             # Generate public & private keys
             public_key_rsa, private_key_rsa = rsa.newkeys(2048)
@@ -123,7 +127,7 @@ class Client:
             private_key = private_key_rsa.save_pkcs1()
 
             # Generate fernet key to encrypt private key
-            fernet_key = pbkdf2_sha256.hash(password, salt=password_hash)
+            fernet_key = pbkdf2_sha256.hash(password, salt=password_hash.encode())
             fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8") # Need to replace '.' with '+' because it is not in the base64 encoding, which is needed for fernet keys
 
             # Encrypt private key
@@ -131,7 +135,7 @@ class Client:
             enc_private_key = f.encrypt(private_key)
 
             # Send all the hashes and keys to server to store
-            result = self._send_command(f"{password_hash.decode()}||{new_salt.decode()}||{public_key.decode()}||{enc_private_key.decode()}")
+            result = self._send_command(f"{password_hash}||{new_salt.decode()}||{public_key.decode()}||{enc_private_key.decode()}")
 
             if not result:
                 raise ServerError
@@ -176,7 +180,10 @@ class Client:
             
             if not result:
                 raise ServerError
-
+            
+    def logout(self, username: str) -> None:
+         self.user.pop(username)
+        
 
     def get_users(self) -> list[str]:
         return list(self._users.keys())
