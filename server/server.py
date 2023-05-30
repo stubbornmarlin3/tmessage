@@ -235,7 +235,13 @@ class Server:
         
         with self.mysql_connection(connection) as (dbc, db):
             
-            pass
+            dbc.execute(
+                "SELECT password_hash FROM users WHERE usernmame = %s LIMIT 1; SELECT 1 FROM users WHERE username = %s",
+                (from_user, to_user)
+            )
+            result = dbc.fetchall()
+
+            print(result)
 
 if __name__ == "__main__":
 
