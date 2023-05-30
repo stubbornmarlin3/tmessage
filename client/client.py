@@ -31,15 +31,11 @@ class Client:
         finally:
             self._socketClient.close()
 
-    def _send_command(self, command: str | bytes) -> str:
+    def _send_command(self, command: str) -> str:
         # Used to send command to the server
-        
-        # Convert to bytes if not already
-        if type(command) == str:
-            command = command.encode()
 
         # Send command
-        self._socketClient.send(command)
+        self._socketClient.send(command.encode())
 
         # Get return from server 
         return self._socketClient.recv(3072).decode()

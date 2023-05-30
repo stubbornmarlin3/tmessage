@@ -1,10 +1,10 @@
 import rsa
 from exceptions import UserDoesNotExist, IncorrectPassword, ServerError
-from client.client import Client
+# from client.client import Client
 
 class User:
 
-    def __init__(self, username: str, display_name: str, password_hash: str, public_key: rsa.PublicKey, private_key: rsa.PrivateKey, client: Client) -> None:
+    def __init__(self, username: str, display_name: str, password_hash: str, public_key: rsa.PublicKey, private_key: rsa.PrivateKey, client) -> None:
 
         self.username = username
         self.display_name = display_name
@@ -25,23 +25,31 @@ class User:
             # Send send message command
             result = self.client._send_command(f"send {to} {self.username}")
 
-            # This will happen if either the 'to' or 'from' user does not exist.
+            # This will happen if either the 'from' user does not exist.
             # This means someone can't just send the command to the sever and send from a random username
             if not result:
-                raise UserDoesNotExist(f"{to} or {self.username}")
+                raise UserDoesNotExist(self.username)
             
-            # If usernames are good, get the 'from' password hash to test
-            # This keeps someone from sending messages from accounts they don't know the password to
+            
+            # If username is good (which it should be unless someone is doing something devious), send 'from' password_hash to confirm access
+            # This keeps someone from sending messages from accounts they don't own
             result = self.client._send_command(self.password_hash)
 
             if not result:
                 raise IncorrectPassword(self.password_hash)
             
+
+            # Send as a everything is good and to grab the public key of to user
+            result = self.client._send_command("<>")
+
+            if not result:
+                raise UserDoesNotExist(to)
+            
             # Make into a usable public key
             to_public_key = rsa.PublicKey.load_pkcs1(result.encode())
 
             # Send the encrypted message to the server
-            result = self.client._send_command(rsa.encrypt(message.encode(),to_public_key))
+            result = self.client._send_command(str(rsa.encrypt(message.encode(),to_public_key)))
 
             if not result:
                 raise ServerError

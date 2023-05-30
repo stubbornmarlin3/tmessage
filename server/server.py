@@ -125,7 +125,7 @@ class Server:
             db_hash, db_salt, display_name, public_key, enc_private_key = result[0] # Get the data returned from the database
             
             # Send back the salt to client. The client will return the hash to check
-            client_hash = self.send_data(f"{db_salt}", connection)
+            client_hash = self.send_data(db_salt, connection)
             print(f"{datetime.now()} {connection.getpeername()} Login username: {username}")
 
             if db_hash != client_hash: # Compare hashes
@@ -205,7 +205,7 @@ class Server:
             db_hash, db_salt = result[0]
 
             # Send back the salt to client. The client will return the hash to check
-            client_hash = self.send_data(f"{db_salt}", connection)
+            client_hash = self.send_data(db_salt, connection)
             print(f"{datetime.now()} {connection.getpeername()} Delete username: {username}")
 
             if db_hash != client_hash: # Compare hashes
@@ -231,17 +231,62 @@ class Server:
 
             self.send_data("<>", connection) # Send this as a way of saying everything went good
 
-    def send_message(self, to_user: str, from_user: str, connection: socket.socket) -> None:
+    def send_message(self, to_user:str, from_user: str, connection: socket.socket) -> None:
+        print(f"{datetime.now()} {connection.getpeername()} Sending message: '{from_user}' -> '{to_user}'...")
         
         with self.mysql_connection(connection) as (dbc, db):
-            
+
+            print(f"{datetime.now()} {connection.getpeername()} Checking {from_user}...")
+
+            # Get the password hash for the 'from_user' to confirm they have access to send messages
             dbc.execute(
-                "SELECT password_hash FROM users WHERE usernmame = %s LIMIT 1; SELECT 1 FROM users WHERE username = %s",
-                (from_user, to_user)
+                "SELECT password_hash FROM users WHERE username = %s LIMIT 1;",
+                (from_user,)
             )
             result = dbc.fetchall()
 
-            print(result)
+            if not result:
+                print(f"{datetime.now()} {connection.getpeername()} Invalid username given: '{from_user}'!")
+                return
+
+            db_hash = result[0][0]
+
+            client_hash = self.send_data("<>", connection)
+
+            if db_hash != client_hash: # Compare hashes
+                print(f"{datetime.now()} {connection.getpeername()} Incorrect password given for username '{from_user}'!")
+                return
+            
+            # Send this saying password was good and now can actually work on sending message
+            self.send_data("<>", connection)
+            
+            # Get the public key for the 'to_user'
+            dbc.execute(
+                "SELECT public_key FROM users WHERE username = %s LIMIT 1;",
+                (to_user,)
+            )
+            result = dbc.fetchall()
+
+            if not result:
+                print(f"{datetime.now()} {connection.getpeername()} Invalid username given: '{to_user}'!")
+                return
+            
+            to_public_key = result[0][0]
+
+            enc_message = self.send_data(to_public_key, connection)
+
+            dbc.execute(
+                "INSERT INTO messages (message_content, sender_id, recipient_id) VALUES (%s, %s, %s);",
+                (enc_message, from_user, to_user)
+            )
+
+            db.commit()
+
+            print(f"{datetime.now()} {connection.getpeername()} Message sent!")
+            
+            # This is sent as a way to say everthing went good server side
+            self.send_data("<>", connection)
+
 
 if __name__ == "__main__":
 
