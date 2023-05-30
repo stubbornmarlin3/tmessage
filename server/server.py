@@ -74,6 +74,8 @@ class Server:
                 self.delete_account(command[1], connection)
             case "send":
                 self.send_message(command[1], command[2], connection)
+            case "fetch":
+                self.fetch_messages(command[1], connection)
             case other:
                 print(f"{datetime.now()} {connection.getpeername()} Unknown command '{command}'!")
                 connection.send(f"Unknown command {command}".encode())
@@ -287,6 +289,43 @@ class Server:
             # This is sent as a way to say everthing went good server side
             self.send_data("<>", connection)
 
+    def fetch_messages(self, username: str, connection: socket.socket):
+        print(f"{datetime.now()} {connection.getpeername()} Fetching messages for {username}...")
+        
+        with self.mysql_connection(connection) as (dbc, db):
+
+            print(f"{datetime.now()} {connection.getpeername()} Checking {username}...")
+
+            # Get the password hash for the 'from_user' to confirm they have access to fetch messages
+            dbc.execute(
+                "SELECT password_hash FROM users WHERE username = %s LIMIT 1;",
+                (username,)
+            )
+            result = dbc.fetchall()
+
+            if not result:
+                print(f"{datetime.now()} {connection.getpeername()} Invalid username given: '{username}'!")
+                return
+
+            db_hash = result[0][0]
+
+            client_hash = self.send_data("<>", connection)
+
+            if db_hash != client_hash: # Compare hashes
+                print(f"{datetime.now()} {connection.getpeername()} Incorrect password given for username '{username}'!")
+                return
+            
+            # Send this saying password was good and now can actually work on fetching messages
+            unread_only = int(self.send_data("<>", connection))
+
+            dbc.execute(
+                f"SELECT sender_id, message_content, timestamp FROM messages WHERE recipient_id = %s {'AND read_status = 0' if unread_only else ''} ORDER BY timestamp ASC;",
+                (username,)
+            )
+            result = dbc.fetchall()
+
+            print(result)
+            
 
 if __name__ == "__main__":
 

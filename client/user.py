@@ -1,10 +1,14 @@
 import rsa
 from exceptions import UserDoesNotExist, IncorrectPassword, ServerError
-# from client.client import Client
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from client.client import Client
+
 
 class User:
 
-    def __init__(self, username: str, display_name: str, password_hash: str, public_key: rsa.PublicKey, private_key: rsa.PrivateKey, client) -> None:
+    def __init__(self, username: str, display_name: str, password_hash: str, public_key: rsa.PublicKey, private_key: rsa.PrivateKey, client: 'Client') -> None:
 
         self.username = username
         self.display_name = display_name
@@ -25,7 +29,7 @@ class User:
             # Send send message command
             result = self.client._send_command(f"send {to} {self.username}")
 
-            # This will happen if either the 'from' user does not exist.
+            # This will happen if the 'from' user does not exist.
             # This means someone can't just send the command to the sever and send from a random username
             if not result:
                 raise UserDoesNotExist(self.username)
@@ -54,9 +58,33 @@ class User:
             if not result:
                 raise ServerError
 
+    def fetch_messages(self, unread_only: bool) -> dict[str,list[str]]:
+        
+        # Test for formatting
 
-    def recv_message(self):
-        pass
+        # Open connection to server
+
+        with self.client._socket_connection():
+            
+            # Send fetch messages command
+            result = self.client._send_command(f"fetch {self.username}")
+
+            # This will happen if the user does not exist.
+            # This means someone can't just send the command to the sever and fetch from a random username
+            if not result:
+                raise UserDoesNotExist(self.username)
+            
+            
+            # If username is good (which it should be unless someone is doing something devious), send user password_hash to confirm access
+            # This keeps someone from fetching messages from accounts they don't own
+            result = self.client._send_command(self.password_hash)
+
+            if not result:
+                raise IncorrectPassword(self.password_hash)
+            
+            self.client._send_command(str(int(unread_only)))
+            
+
 
     def regen_keys(self):
         pass
@@ -69,4 +97,3 @@ class User:
 
     def change_username(self):
         pass
-
