@@ -1,5 +1,5 @@
 import rsa
-from exceptions import UserDoesNotExist, IncorrectPassword, ServerError
+from exceptions import UserDoesNotExist, IncorrectPassword, ServerError, MessageTooLong
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,6 +21,9 @@ class User:
     def send_message(self, to:str, message:str) -> None:
         
         # Test for formatting
+
+        if len(message.encode()) > 245:
+            raise MessageTooLong
 
         # Open connection to server
 
@@ -53,7 +56,7 @@ class User:
             to_public_key = rsa.PublicKey.load_pkcs1(result.encode())
 
             # Send the encrypted message to the server
-            result = self.client._send_command(str(rsa.encrypt(message.encode(),to_public_key)))
+            result = self.client._send_command(str(rsa.encrypt(message.encode(),to_public_key),encoding="raw_unicode_escape"))
 
             if not result:
                 raise ServerError
@@ -83,7 +86,31 @@ class User:
                 raise IncorrectPassword(self.password_hash)
             
             self.client._send_command(str(int(unread_only)))
-            
+
+            messages = {}
+
+            while True:
+
+                result = self.client._send_command("<>") # Send this after each row that was grabbed as a way to say 'received'
+
+                if result == "<>":
+                    break
+
+                if not result:
+                    raise ServerError
+
+                sender_id, message_content = result.split("||")
+
+                message_content = rsa.decrypt(bytes(message_content, "raw_unicode_escape"), self.private_key).decode()
+
+                try:
+                    messages[sender_id].append(message_content)
+                except KeyError:
+                    messages.update({sender_id:[message_content]})
+
+
+        return messages
+
 
 
     def regen_keys(self):

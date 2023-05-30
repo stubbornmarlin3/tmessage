@@ -24,4 +24,10 @@ class ServerError(Exception):
     def __init__(self, *args: object) -> None:
         "Raised when something goes wrong server side"
 
-        super().__init__(f"Something went wrong on the server!", *args)
+        super().__init__("Something went wrong on the server!", *args)
+
+class MessageTooLong(Exception):
+
+    def __init__(self, *args: object) -> None:
+        "Raised when the message is too long to be sent"
+        super().__init__("The message you are sending is too long!",*args)

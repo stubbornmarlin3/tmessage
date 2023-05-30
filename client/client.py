@@ -19,7 +19,7 @@ class Client:
         self._server_port = server_port
 
         # Alloc a list where Users connected to this client are held
-        self.user = {}
+        self.user:dict[str,User] = {}
 
     @contextmanager
     def _socket_connection(self) -> None:
@@ -191,6 +191,14 @@ if __name__ == "__main__":
 
     c1 = Client("localhost", 35491)
 
+
+    c1.login("arcar","stryker03")
+    c1.user["arcar"].send_message("test","New message")
+
+    c1.login("test","password")
+    messages = c1.user["test"].fetch_messages(True)
+
+    print(messages)
 
 
     

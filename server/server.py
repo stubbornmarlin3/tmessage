@@ -238,7 +238,7 @@ class Server:
         
         with self.mysql_connection(connection) as (dbc, db):
 
-            print(f"{datetime.now()} {connection.getpeername()} Checking {from_user}...")
+            print(f"{datetime.now()} {connection.getpeername()} Checking '{from_user}'...")
 
             # Get the password hash for the 'from_user' to confirm they have access to send messages
             dbc.execute(
@@ -294,7 +294,7 @@ class Server:
         
         with self.mysql_connection(connection) as (dbc, db):
 
-            print(f"{datetime.now()} {connection.getpeername()} Checking {username}...")
+            print(f"{datetime.now()} {connection.getpeername()} Checking '{username}'...")
 
             # Get the password hash for the 'from_user' to confirm they have access to fetch messages
             dbc.execute(
@@ -319,12 +319,33 @@ class Server:
             unread_only = int(self.send_data("<>", connection))
 
             dbc.execute(
-                f"SELECT sender_id, message_content, timestamp FROM messages WHERE recipient_id = %s {'AND read_status = 0' if unread_only else ''} ORDER BY timestamp ASC;",
+                f"SELECT sender_id, message_content FROM messages WHERE recipient_id = %s {'AND read_status = 0' if unread_only else ''} ORDER BY sender_id ASC, timestamp ASC;",
                 (username,)
             )
             result = dbc.fetchall()
 
-            print(result)
+            self.send_data("<>", connection) # Send this to say its going to start sending the fetched messages
+
+            print(f"{datetime.now()} {connection.getpeername()} Sending fetched messages to client...")
+
+            for row in result:
+                self.send_data(f"{row[0]}||{row[1]}", connection)
+
+            print(f"{datetime.now()} {connection.getpeername()} Updating read status...")
+
+            dbc.execute(
+                "UPDATE messages SET read_status = 1 WHERE recipient_id = %s",
+                (username,)
+            )
+
+            db.commit()
+
+            print(f"{datetime.now()} {connection.getpeername()} Fetch complete!")
+
+            # Say everything went good server side
+            self.send_data("<>", connection)
+
+            
             
 
 if __name__ == "__main__":
