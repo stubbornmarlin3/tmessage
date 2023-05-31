@@ -101,7 +101,7 @@ class Server:
     
     def send_data(self, data: str, connection: socket.socket) -> str:
         # Send data
-        connection.send(data.encode())
+        connection.sendall(data.encode())
 
         # Get return from client 
         return connection.recv(3072).decode()

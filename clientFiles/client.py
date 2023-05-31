@@ -3,6 +3,7 @@
 import os
 import rsa
 import socket
+import time
 from user import User
 from exceptions import IncorrectPassword, UserDoesNotExist, UserAlreadyExists, ServerError
 from passlib.hash import pbkdf2_sha256
@@ -13,6 +14,8 @@ from base64 import b64encode
 class Client:
 
     def __init__(self, server_hostname: str, server_port: int) -> None:
+
+        self._recv_timeout = 2
         
         # Set hostname and port for the server from the creation of the client
         self._server_hostname = server_hostname 
@@ -25,8 +28,9 @@ class Client:
     def _socket_connection(self) -> None:
         try:
             self._socketClient = socket.socket()
-            self._socketClient.settimeout(20)
+            self._socketClient.settimeout(30)
             self._socketClient.connect((self._server_hostname, self._server_port))
+            self._socketClient.setblocking(0)
             yield
         finally:
             self._socketClient.close()
@@ -37,8 +41,36 @@ class Client:
         # Send command
         self._socketClient.send(command.encode())
 
-        # Get return from server 
-        return self._socketClient.recv(3072).decode()
+        # Recv data in chuncks
+        returnData = []
+
+        last_chunk_time = float('inf')
+        while True:
+
+            try:
+                
+                # Try to receive some data. If there is none it will return an Exception. 
+                data = self._socketClient.recv(1024).decode()
+
+                # If there is data but it is empty, the connection was probably closed on the server side, so break
+                if not data:
+                    break
+
+                # If there was data, append it to the returnData list and set the last_chunk_time
+                returnData.append(data)
+                last_chunk_time = time.time()
+
+            except:
+                
+                # If data has begun coming in, last_chunk_time will be set. If no data comes in past the timeout, then break
+                if time.time() - last_chunk_time > self._recv_timeout:
+                    break
+                
+                # Just to add some delay between recv
+                time.sleep(0.01)
+
+        # Return the data as a combined string
+        return ''.join(returnData)
 
     def login(self, username: str, password: str) -> None:
 
@@ -80,6 +112,7 @@ class Client:
             fernet_key = bytes(f"{fernet_key[-43:]}=".replace(".","+"),"utf-8") # Need to replace '.' with '+' because it is not in the base64 encoding, which is needed for fernet keys
 
             f = Fernet(fernet_key)
+
 
             private_key = f.decrypt(enc_private_key).decode()
 
