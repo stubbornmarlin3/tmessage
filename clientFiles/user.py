@@ -3,7 +3,7 @@ from exceptions import UserDoesNotExist, IncorrectPassword, ServerError, Message
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from client.client import Client
+    from client import Client
 
 
 class User:
@@ -43,7 +43,7 @@ class User:
             result = self.client._send_command(self.password_hash)
 
             if not result:
-                raise IncorrectPassword(self.password_hash)
+                raise IncorrectPassword
             
 
             # Send as a everything is good and to grab the public key of to user
@@ -83,7 +83,7 @@ class User:
             result = self.client._send_command(self.password_hash)
 
             if not result:
-                raise IncorrectPassword(self.password_hash)
+                raise IncorrectPassword
             
             self.client._send_command(str(int(unread_only)))
 

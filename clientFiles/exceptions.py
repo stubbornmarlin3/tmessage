@@ -7,10 +7,10 @@ class UserDoesNotExist(Exception):
 
 class IncorrectPassword(Exception):
 
-    def __init__(self, password: str) -> None:
+    def __init__(self, *args: object) -> None:
         "Raised when the password hash does not match one in Database"
 
-        super().__init__(f"The password '{password}' was incorrect!")
+        super().__init__(f"The password was incorrect!", *args)
 
 class UserAlreadyExists(Exception):
 
@@ -30,4 +30,4 @@ class MessageTooLong(Exception):
 
     def __init__(self, *args: object) -> None:
         "Raised when the message is too long to be sent"
-        super().__init__("The message you are sending is too long!",*args)
+        super().__init__("The message you are sending is too long!", *args)

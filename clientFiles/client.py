@@ -70,7 +70,7 @@ class Client:
             result = self._send_command(test_hash)
 
             if not result:
-                raise IncorrectPassword(password)
+                raise IncorrectPassword
 
             display_name, public_key, enc_private_key = result.split("||")
 
@@ -170,7 +170,7 @@ class Client:
             result = self._send_command(test_hash)
 
             if not result:
-                raise IncorrectPassword(password)
+                raise IncorrectPassword
             
             result = self._send_command("<>") # Send this as a way to check for status of 
             
